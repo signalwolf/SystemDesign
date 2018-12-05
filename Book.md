@@ -167,8 +167,16 @@
     1.  Usually have 3 replicas: 一般来说在一个data center有两个，这样一个leader failed了可以快速的切换另一个，由于在同一个datacenter，
     两个机器上的内容差异较小；但是相应的如果当前的datacenter failed了，如断电、地震等，那么就需要完了；故而一般会在另一个data center再有
     一个follower 来保证系统的运行；
-3.  Sync or async replication:
-    1.  所谓sync or async，其实就是user在做sync的时候      
-    
+    2.  Sync or async replication:
+        1.  所谓sync or async，其实就是user在做update的时候，Master先被update了，然后Master会发送write请求给slave要求他们update。
+        那么是否告诉user他的update已经完成？还是说等slave都update后再告诉user完成了？因为user的 write 肯定是在master上，
+        但是user 的read 就可能发生在任意的slave机器上。
+        2.  如果此时slave机器上并没有接受到write 的请求，那么user会发现update没有生效，这是user在master上update完成后就直接回复的缺点；
+        3.  那么如果等所有的slave都write完成了的话，那么user的等待时间就会非常的长。毕竟有一个slave可能在很远的地方。更可怕的是，如果slave
+        宕机了，那么不可能被update，user要无限制的等待下去。
+        4.  In practical, 一般认为sync的情况不是等所有的slave都回复，而是说等一个slave回复就可以了，其他的仍旧是async
+        5.  In practical, leader based replication is configured to be completely async. Async is widely used.
+    3.  
+        
             
     
