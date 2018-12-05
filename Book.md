@@ -102,7 +102,7 @@
         另外的优化就是将部分的内容存入到disk上，然后在丢失memory后从disk读。
     4.  由于这些因素，hash index适合于key 非常的少，并且 write非常的多的情况；
     
-3.  Optimization2: SSTable + LSM Tree
+3.  Optimization2: SSTable + LSM Tree: google file system:
     1.  SSTable: sorted string table
         1.  在optimization1 中主要的问题是Key must fit into RAM, 也就是说当key多的时候就会出现问题；或者换一个比较大的memory
         或者减小disk的size；
@@ -111,12 +111,64 @@
             2.  然后chunck里面的key是sorted的；
             2.  然后key - value pair 不使用 int，而是使用 string: disk offset的对比
         3.  优点包括：
-            1.  Merge segment 相比于 hash index更efficient，在hash index过程中需要将两个segment的内容merge是需要将它们都load
-            到memory中，而在SSTable中，进行merge的是两个sorted的segement，这样进行merge sort的话远比Hash index更快；
+            1.  Merge segment 相比于 hash index更efficient，在hash index过程中需要将多个segment的内容merge是需要将它们都load
+            到memory中，而在SSTable中，进行merge的是多个sorted的segment，这样进行merge sort的话只要indexing
                 1.  Hash index segement merge: 
-                    1.  O(2n), O(2n), use hash table to remember which one inside the two segement
+                    1.  O(2n), O(2n), use hash table to remember which one inside the two segment, if hit duplication,
+                    update the table.
+                    2.  需要push两个 segment到memory中才能进行这样的操作； 
                 2.  SSTable chunk merge: 
                     1.  merge sort O(2n), O(1) (don't consider the output memory use): two index tracking two segment
                     then move the index to find the data. 
-                    2.  
+                    2.  可以不用push segment到memory中,只要index 它
+            2.  Sparse index in memory: 需要再看
+                1.  由于chunk内是 sorted的，而且chunk之间也是sorted的，于是就可以让 memory中的key 变得sparse，也就是我们不存所有
+                的key，而只存一部分的key。如果一个新的read出来了，那么现在memory中找到其boundary，然后再到对应的disk区域去找。
+        4.  write:
+            1.  在memory中开一个red black tree, 然后不停的处理进入的data key, 做好mapping 
+            2.  当memory中的data (Memtable)的size不断增大后，达到chunk size的手将内容放入到disk上，成为SSTable.
+        5.  read:
+            1.  当有个需求request的时候，看它是否在memory中，binary search ( O(logn))
+            2.  如果没有的话，去disk上找最后的SSTable, 看是否在其中，如果不在就继续向前找更old的data
+        6.  Compact:
+            1.  From time to time, run merging and compaction process in background.
+        7.  Notes: 需要确认
+            1.  注意的是memory中有两项，一个是red black tree记录的当前的SSTable, 另一个是 key - value pair, key是sorted的key
+
+4.  B-Tree: Most widely used: relational and nonrelational both use this structure:
+    1.  Build the B tree:
+        1.  B tree break the database down into fixed size blocks or pages.
+        2.  Each page is identified using an address or location, so one page can refer to another like an pointer. 
+        3.  Page saved to disk. Each page can have pointer point to other page or an key.
+        4.  The left node on key is point to an page where each key in that page lower than current key; right node is point
+        to a page larger than the key. 
+        5.  The tree can keep going till the leaf child, it also have key to set the boundary but it don't have reference
+        it only have values.
+    2.  The number of reference to child pages in one page of B tree is called the branching factor, it typically several 
+    hundred.
+    3.  有算法在background running来让整个structure remain balanced:
+        1.  4 level of 4KB pages with a braching factore of 500 can store up to 256 TB.
+        2.  4 level of B tree --> one node have 500 reference or up to 500 child.
+        3.  At the last level or the 4th level, there is power(500, 3) child
+        4.  Each pages is 4KB --> 4kB * 500 * 500 * 500 / 2 (half used for boundary) = 25 * power(10, 7) KB = 250 GB
+        但是不知道为什么书上说 256 TB.
+    4.  B tree 的增加与修改：
+        当B tree 增加一个value时候，如果下面的已经满了，就split 成两份然后range request 也相应的改变。
+5.  B tree vs LSM tree:
+    1.  Rule of thumb: LSM trees are faster on write; B trees are faster on read. 
+    2.  Advantage of LSM tree:
+        1.  Faster on write:
+            1.  B tree 需要写两次，一次是记录下现在正在做的操作，一次是真正的修改。这是为了防止突然的failure而LSM tree不需要
+            2.  这种行为叫做 write amplification, LSM的 write amplification 非常小。
+            
+# Chapter5 Replication:
+1.  Considerations: sync or async replication, handle failed replicas. 
+2.  Master slave model:
+    1.  Usually have 3 replicas: 一般来说在一个data center有两个，这样一个leader failed了可以快速的切换另一个，由于在同一个datacenter，
+    两个机器上的内容差异较小；但是相应的如果当前的datacenter failed了，如断电、地震等，那么就需要完了；故而一般会在另一个data center再有
+    一个follower 来保证系统的运行；
+3.  Sync or async replication:
+    1.  所谓sync or async，其实就是user在做sync的时候      
+    
+            
     
