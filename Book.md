@@ -103,38 +103,37 @@
     4.  由于这些因素，hash index适合于key 非常的少，并且 write非常的多的情况；
     
 3.  Optimization2: SSTable + LSM Tree: google file system:
-    1.  SSTable: sorted string table
+    1.  SSTable: sorted string table; LSM: log structured merge tree:
         1.  在optimization1 中主要的问题是Key must fit into RAM, 也就是说当key多的时候就会出现问题；或者换一个比较大的memory
         或者减小disk的size；
-        2.  优化的地方在于：
-            1.  首先是将磁盘分为64KB大小的chunk，相比于传统的chunk size更大（普通的大约为1K）
-            2.  然后chunck里面的key是sorted的；
-            2.  然后key - value pair 不使用 int，而是使用 string: disk offset的对比
+        2.  原理：
+            4.  write:
+                1.  在memory中开一个red black tree, 然后不停的处理进入的data key, 做好mapping 
+                2.  当memory中的data (Memtable)的size不断增大后，达到chunk size的手将内容放入到disk上，成为SSTable.
+            5.  read:
+                1.  当有个需求request的时候，看它是否在memory中，binary search ( O(logn))
+                2.  如果没有的话，去disk上找最后的SSTable, 看是否在其中，如果不在就继续向前找更old的data
+            6.  Compact:
+                1.  From time to time, run merging and compaction process in background. 类似于merge sort，产生一个新的SSTable
+                    1.  Hash index segement merge: 
+                        1.  O(2n), O(2n), use hash table to remember which one inside the two segment, if hit duplication,
+                        update the table.
+                        2.  需要push两个 segment到memory中才能进行这样的操作； 
+                    2.  SSTable chunk merge: 
+                        1.  merge sort O(2n), O(1) (don't consider the output memory use): two index tracking two segment
+                        then move the index to find the data. 
+                        2.  可以不用push segment到memory中,只要index 它
+            7.  Delete:
+                1.  Map the key to an deletion record, 当读的时候，肯定是先读最近的，然后回溯，这样就能先读到 deletion record从而
+                停止了读的过程故而读出来的内容仍旧是对的。
+                
         3.  优点包括：
             1.  Merge segment 相比于 hash index更efficient，在hash index过程中需要将多个segment的内容merge是需要将它们都load
             到memory中，而在SSTable中，进行merge的是多个sorted的segment，这样进行merge sort的话只要indexing
-                1.  Hash index segement merge: 
-                    1.  O(2n), O(2n), use hash table to remember which one inside the two segment, if hit duplication,
-                    update the table.
-                    2.  需要push两个 segment到memory中才能进行这样的操作； 
-                2.  SSTable chunk merge: 
-                    1.  merge sort O(2n), O(1) (don't consider the output memory use): two index tracking two segment
-                    then move the index to find the data. 
-                    2.  可以不用push segment到memory中,只要index 它
-            2.  Sparse index in memory: 需要再看
-                1.  由于chunk内是 sorted的，而且chunk之间也是sorted的，于是就可以让 memory中的key 变得sparse，也就是我们不存所有
-                的key，而只存一部分的key。如果一个新的read出来了，那么现在memory中找到其boundary，然后再到对应的disk区域去找。
-        4.  write:
-            1.  在memory中开一个red black tree, 然后不停的处理进入的data key, 做好mapping 
-            2.  当memory中的data (Memtable)的size不断增大后，达到chunk size的手将内容放入到disk上，成为SSTable.
-        5.  read:
-            1.  当有个需求request的时候，看它是否在memory中，binary search ( O(logn))
-            2.  如果没有的话，去disk上找最后的SSTable, 看是否在其中，如果不在就继续向前找更old的data
-        6.  Compact:
-            1.  From time to time, run merging and compaction process in background.
-        7.  Notes: 需要确认
-            1.  注意的是memory中有两项，一个是red black tree记录的当前的SSTable, 另一个是 key - value pair, key是sorted的key
-
+            2.  不需要将所有的key 都存在memory中，只需要存一部分。
+            3.  虽然相比于 hash index, 写是慢了些，但是相比于B tree, 那是非常的快了；
+            
+               
 4.  B-Tree: Most widely used: relational and nonrelational both use this structure:
     1.  Build the B tree:
         1.  B tree break the database down into fixed size blocks or pages.
@@ -176,7 +175,18 @@
         宕机了，那么不可能被update，user要无限制的等待下去。
         4.  In practical, 一般认为sync的情况不是等所有的slave都回复，而是说等一个slave回复就可以了，其他的仍旧是async
         5.  In practical, leader based replication is configured to be completely async. Async is widely used.
-    3.  
+    3.  New follower的setup:
+        1.  Master 每隔一段时间就保存一个snapshot（包括timestamp）, 然后当new slave setup的时候，先copy snapshot到自己的机器上
+        并建立内容，然后再向master要这个时间点之后的所有的update，然后就catch up 了
+    4.  handling node outage:
+        1.  Slave failure: 
+        类似于new slave的add，向leader request all change after the last stamp the failed slave processed. 也叫catch up
+        2.  Leader failure: failover
+        one of slave need to promoted to be the new leader.
+            1.  两种方法：其一：election；其二：previous leader appoint
+            2.  注意的是要将恢复了的leader变成slave，否则两个machine 都认为自己是leader会造成write的重复发送；例如1，2，3三台机器，
+            1号作为master failed，2号promote 成了master，那么2号会接受所有的写，然后再去写1/3, 此时3起来了觉得自己是mater，在收到了
+            write后又会再向其他的node发送write。************
         
             
     
