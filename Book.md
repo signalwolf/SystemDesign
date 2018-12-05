@@ -84,10 +84,18 @@
     2.  Read:
         1.  hash中寻找requested key
         2.  然后通过key找到其硬盘上的位置
+    3.  Delete:
+        1.  append a special deletion record to data file. In read, the key value set map key to deletion record
+        it is deletion record, so not return anything. But those data still in disk
+        2.  Those record get deleted during the compacting data process, when merge things and get the last record 
+        is deletion record, removed everything before it. 
     3.  Problem: 
         1.  Keys must fit into RAM. 如果data非常多就有问题了
         2.  需要compact data，对于新来的data，必须要compact data, 否则disk就fill非常快了
         3.  Range request 非常麻烦，需要扫描整个 hashmap.
+        4.  Crash recovery 也是一个问题，毕竟 hash index 都存在于 memory中，而断电后，memory被清空。因此在disk存的data也需要
+        加入index，这样才能recovery，只是如果data 很多的话，需要遍历一遍较久；
+        另外的优化就是将部分的内容存入到disk上，然后在丢失memory后从disk读。
     4.  由于这些因素，hash index适合于key 非常的少，并且 write非常的多的情况；
     
 3.  Optimization2: SSB
