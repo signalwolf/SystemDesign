@@ -271,4 +271,10 @@
             2.  写带上 replica ID，故而丢弃的时候可以根据replica ID来丢弃
             3.  merge both write
             4.  弹出提示，要求用户决定
-        2.  
+        2.  处理情况：
+            1.  在写的时候处理：当发现conflict 的时候就决定是丢弃掉哪一个
+            2.  在读的时候处理：当发现conflict，都写入，然后再在读的时候进行处理
+    6.  Replication topologies:
+        1.  Circular topology: 作为环来处理，lead1 update 后传给leader2, 然后3，然后4 直至传回给leader1
+        2.  Star topology: 类似于树的结构，改了自己后给所有的子树发修改要求
+        3.  All to all topology: 向所有的node都发，每个包都包含其经过的node的ID，每个node会尝试解包，如果发现自己的node在，那就discard.
