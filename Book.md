@@ -223,7 +223,43 @@
             1.  两种方法：其一：election；其二：previous leader appoint
             2.  注意的是要将恢复了的leader变成slave，否则两个machine 都认为自己是leader会造成write的重复发送；例如1，2，3三台机器，
             1号作为master failed，2号promote 成了master，那么2号会接受所有的写，然后再去写1/3, 此时3起来了觉得自己是mater，在收到了
-            write后又会再向其他的node发送write。************
-        
-            
-    
+            write后又会再向其他的node发送write。
+    5.  Replication 的log的design:
+        1.  Statement based: 不常用。
+            1.  例如说直接发送client的SQL语句给周围的node，但是这样有很严重的问题在处理 Now和random, 每个指令到machine的时间不同，now肯定
+            不一样；而每个random出来的也肯定是不一样的；
+            2.  另一个缺点就是每个指令到达的机器的时间不一样，如果在master上后发的先到了并且与前面的有冲突，那么无法处理了
+        2.  Write ahead log shipping:
+            1.  直接将log发送给其他的机器。例如说red black tree在存入到disk成为SSTable时时有log来防止memory丢失的。这就是log，将这个
+            发送给其他的node就可以了。
+            2.  缺点就是如果两台机器的database不同，version不同，都可能造成log的logging以及understanding都是不同的。此时往往需要downtime
+            来同时upgrade整个database
+        3.  Logical log replication:
+            1.  这就是说从当前的data/log中建立一个逻辑log来表示操作。这样就明白就脱离了底层的database的实现的细节而直接可以直接在多台
+            不同的机器上共同使用
+        4.  Trigger based replication:
+            1.  自己设计一个code来update，当有update来的时候，code对它进行处理后再写入到database当中。
+    6.  Problem with replication lag:
+        1.  用户update之后再看内容发现没update，因为Master上的update了但是slave没update，而用户读取的时候可能是任意的一台slave
+            1.  优化1：常修改的部分只读于 Master
+            2.  优化2：在timer(1mins)内的修改后的read都只读于Master
+            3.  优化3：给用户的request中加入下上次修改这个内容的时间
+        2.  多次读取消息不一致，由于replication lag导致slave上的内容稍有不同。譬如你看微博，第一次刷看到了一些内容，第二次刷就看不到了，
+        丢失了。这是因为用户先连上了更新的server，然后再刷的时候连上了老的server
+            1.  优化：Monotonic Read: 保证从不回看。一种方法是短期内的读只读与同一个replica
+        3.  有时间上前后关系的内容被无order化，例如群聊的时候，A先说再是B，然后C在旁边看却看到B的回复先然后才是A的问题。这就很奇怪了。这是
+        因为C连的服务器对A/B的data到来的顺序不一样。
+            1.  优化：consistent prefix reads. 保证write的顺序不变。Write always hapend on same replica
+    7.  多个的replica node非常适合于read 多写的少的情况。这样每个node都分流了，但是一定要考虑上述的replication lag的问题。
+
+3. Multi-leader solution:
+    1.  Single leader的主要的问题在于说如果一个用户因为什么原因无法连上 Leader/Master 的话，那么就无法对 database进行任何的修改。
+    2.  一般来说，在一个data center里面使用multi-leader是很少见的。一般的操作是在多个data center中留一个leader. 在data center内部仍旧
+    使用regular的master-slave的模型。
+    3.  但是因为multi-leader的存在，多个leader之间肯定是有conflict的，那么就需要一个additional的 conflict resolution 模块。
+    4.  与single leader的对比以及使用场景
+        1.  由于有多个leader，故而能分流写的操作。然后由于每个data center都在用户附近，故而写的操作也更快（网络延时更小）--> write heavy的应用
+        2.  某个data center 的leader挂掉了并无关系，甚至整个data center都挂掉了也没有关系 --> reliability要求较高的情况
+        3.  最大的问题就是 conflict resolution
+        4.  线下处理的时候也一定是要用 multi-leader的，例如在手机上update了的东西和在电脑上应该要同步；但是用户的update可能只是在offline
+        你需要保存offline的情况下的用户的update也要
