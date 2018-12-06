@@ -128,8 +128,8 @@
                 停止了读的过程故而读出来的内容仍旧是对的。
             8.  其他：
                 1.  在使用SSTable的时候，还需要注意的是对断电等突发事件的防御（reliability），毕竟如果突然断电，Memory里面的data就
-                完全丢失了，这样无法还原了；故而在我们对数进行操作之前，我们先commit log，记录下我们要做什么，如果
-                
+                完全丢失了，这样无法还原了；故而在我们对Memory里的树进行操作之前，我们先commit log，记录下我们要做什么，如果断电了，我们
+                还是可以从log里面再还原出memory里面的树
         3.  优点包括：
             1.  Merge segment 相比于 hash index更efficient，在hash index过程中需要将多个segment的内容merge是需要将它们都load
             到memory中，而在SSTable中，进行merge的是多个sorted的segment，这样进行merge sort的话只要indexing
@@ -140,8 +140,19 @@
             但是不知道要取多少次 --> O(mlogn)，尤其是要找一个不存在的key，这样就使得每次找都非常的麻烦。
             --> 优化是使用 Bloom filter, 这样的话看一个SSTable的时候可以先用Bloom filter来查看在当前的Segment里面是否有我们要找的
             key，如果没有的话就可以直接pass了；Bloom filter可以快速看是否不存在key, 如果说不存在就一定不存在，如果说存在那不一定存在。
+        5.  Reference:
+            1.  http://www.ituring.com.cn/article/19383
+            2.  https://www.cnblogs.com/fxjwind/archive/2012/08/14/2638371.html
                
 4.  B-Tree: Most widely used: relational and nonrelational both use this structure:
+    B tree其实就是多路平衡查找树
+    1.  B tree的特性： Details 见reference1. 
+        1.  B tree的生长是自下往上生长的，当下面的满了的时候将node push到上面的level，然后再看上层是否满了，
+        如此往复循环直到整个B tree都满了为止。
+        2.  定义： branching factor = m，那么有 m/2 向上取整个reference, m/2向下取整个 key/boundary. 也就是说对一个node来说
+        最多有 m/2 向上取整个子树，或者 m/2 + 1个子树；除了根节点和叶子节点以外，
+        3.  如果根节点不是叶子节点的话，那么它至少有两个子树
+        4.  除了根节点外，其他节点都包含 n 个 key. 
     1.  Build the B tree:
         1.  B tree break the database down into fixed size blocks or pages.
         2.  Each page is identified using an address or location, so one page can refer to another like an pointer. 
@@ -160,12 +171,31 @@
         但是不知道为什么书上说 256 TB.
     4.  B tree 的增加与修改：
         当B tree 增加一个value时候，如果下面的已经满了，就split 成两份然后range request 也相应的改变。
+    5.  B tree的优点:
+        1.  读起来被认为是更快的，B tree的读每次都只要找到一条path到 leaf node, 而root 到leaf也就是3-4 层。故而更快
+        2.  只是每次的读都是从disk上读，也就是random的读，这样的读取是非常的缓慢的；
+    6.  B tree的缺点：
+        1.  B tree的写比较慢，首先写入要先做read，然后还要检查是否有这个key, 没有的话之后要检查是否满了。满了还要slpit并且改变整个的
+        结构。故而时间会比较慢。
+    5.  Reference:
+        1.  https://zhuanlan.zhihu.com/p/24309634 插入
+        2.  https://zhuanlan.zhihu.com/p/24350783 删除
+        
 5.  B tree vs LSM tree:
     1.  Rule of thumb: LSM trees are faster on write; B trees are faster on read. 
     2.  Advantage of LSM tree:
         1.  Faster on write:
             1.  B tree 需要写两次，一次是记录下现在正在做的操作，一次是真正的修改。这是为了防止突然的failure而LSM tree不需要
             2.  这种行为叫做 write amplification, LSM的 write amplification 非常小。
+        2.  LSM tree 的size更小，故而同一台机器上可以存储更多的内容。SSTable的overhead 远比B tree page的小，毕竟B tree的上面的多层
+        都只是一个reference而不是一个有用的page,就算在最后一层上，也有一半的space被用作 boundary. 
+    3.  Disadvantage of LSM tree:
+        1.  Compression process是消耗资源的，在idle状态下可能还好，但是如果在峰值的时候做这个操作就会造成load增加。毕竟memory是shared
+        于新的读、写与compression的，于是就造成了其他的读写操作受影响；同样，当写到磁盘上的时候也会和写新的SSTable产生share 磁盘write
+        bandwidth的情况，由此造成performance收到了影响
+        2.  LSM tree的key不是唯一的，在LSM tree中 key肯定是有duplicate的，并且需要compaction来解决这个问题。而B tree中的key 是唯一的
+        对于transactional semantics 是需要的（说是要lock key）
+            
             
 # Chapter5 Replication:
 1.  Considerations: sync or async replication, handle failed replicas. 
