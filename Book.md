@@ -109,7 +109,7 @@
         2.  原理：
             4.  write:
                 1.  在memory中开一个red black tree, 然后不停的处理进入的data key, 做好mapping 
-                2.  当memory中的data (Memtable)的size不断增大后，达到chunk size的手将内容放入到disk上，成为SSTable.
+                2.  当memory中的data (Memtable)的size不断增大后，达到chunk size的时候将内容放入到disk上，成为SSTable.
             5.  read:
                 1.  当有个需求request的时候，看它是否在memory中，binary search ( O(logn))
                 2.  如果没有的话，去disk上找最后的SSTable, 看是否在其中，如果不在就继续向前找更old的data
@@ -126,13 +126,20 @@
             7.  Delete:
                 1.  Map the key to an deletion record, 当读的时候，肯定是先读最近的，然后回溯，这样就能先读到 deletion record从而
                 停止了读的过程故而读出来的内容仍旧是对的。
+            8.  其他：
+                1.  在使用SSTable的时候，还需要注意的是对断电等突发事件的防御（reliability），毕竟如果突然断电，Memory里面的data就
+                完全丢失了，这样无法还原了；故而在我们对数进行操作之前，我们先commit log，记录下我们要做什么，如果
                 
         3.  优点包括：
             1.  Merge segment 相比于 hash index更efficient，在hash index过程中需要将多个segment的内容merge是需要将它们都load
             到memory中，而在SSTable中，进行merge的是多个sorted的segment，这样进行merge sort的话只要indexing
-            2.  不需要将所有的key 都存在memory中，只需要存一部分。
+            2.  不需要将所有的key 都存在memory中，只需要存一部分也就是那个Chunk size的内存
             3.  虽然相比于 hash index, 写是慢了些，但是相比于B tree, 那是非常的快了；
-            
+        4.  缺点包括：
+            1.  读起来比较麻烦：因为每次的读都需要从memory中取然后再要从存在磁盘上的SSTable上去取。虽然每次都是O(logn)的process time
+            但是不知道要取多少次 --> O(mlogn)，尤其是要找一个不存在的key，这样就使得每次找都非常的麻烦。
+            --> 优化是使用 Bloom filter, 这样的话看一个SSTable的时候可以先用Bloom filter来查看在当前的Segment里面是否有我们要找的
+            key，如果没有的话就可以直接pass了；Bloom filter可以快速看是否不存在key, 如果说不存在就一定不存在，如果说存在那不一定存在。
                
 4.  B-Tree: Most widely used: relational and nonrelational both use this structure:
     1.  Build the B tree:
