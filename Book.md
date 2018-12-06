@@ -262,4 +262,13 @@
         2.  某个data center 的leader挂掉了并无关系，甚至整个data center都挂掉了也没有关系 --> reliability要求较高的情况
         3.  最大的问题就是 conflict resolution
         4.  线下处理的时候也一定是要用 multi-leader的，例如在手机上update了的东西和在电脑上应该要同步；但是用户的update可能只是在offline
-        你需要保存offline的情况下的用户的update也要
+        你需要保存offline的情况下的用户的update也要保持一个非update的version，这时候如果只是signle leader，那么它连接着某个device，在等待
+        update，然而其他的device要access这个node的时候就会出问题
+        5.  同时update一个文件的时候也需要 multi-leader，因为多人在对同一个database上的文件进行操作。
+    5.  Conflict handling:
+        1.  处理方式
+            1.  写带上 unqiue ID(timestamp etc), 故而可以使用 last write wins的策略丢掉更靠前的data
+            2.  写带上 replica ID，故而丢弃的时候可以根据replica ID来丢弃
+            3.  merge both write
+            4.  弹出提示，要求用户决定
+        2.  
