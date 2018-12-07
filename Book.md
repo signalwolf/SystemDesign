@@ -277,4 +277,8 @@
     6.  Replication topologies:
         1.  Circular topology: 作为环来处理，lead1 update 后传给leader2, 然后3，然后4 直至传回给leader1
         2.  Star topology: 类似于树的结构，改了自己后给所有的子树发修改要求
+        --> 上面的两种方式有个严重的问题就在于说如果有一个node failed了，那么余下的都是问题。于是有了第三个方式
         3.  All to all topology: 向所有的node都发，每个包都包含其经过的node的ID，每个node会尝试解包，如果发现自己的node在，那就discard.
+        --> all to all 的问题在于order 无法保证；假如client A在lead1上将 A 从1 改为0；C 在A改完了后的时间上在 lead3 上将 A 从 1 改为 2
+        那么这时候二者都会发 change request to lead2. 如果 lead3的信息先到，那么 lead1的信息可能就会被 discard.
+        4.  解决办法是 version vector.
