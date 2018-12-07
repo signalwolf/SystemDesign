@@ -197,11 +197,15 @@
         对于transactional semantics 是需要的（说是要lock key）
             
             
-# Chapter5 Replication:
+# Chapter5 Replication: Keeping a copy of the same data on several different nodes:
 1.  Considerations: sync or async replication, handle failed replicas. 
-2.  Master slave model:
+2.  Replica 的主要作用有：
+    1.  High availabilty: 一个倒掉了不会全部掉，整个网络永远都可以access
+    2.  Latency: 就近的处理信息，让网络延迟尽可能的少
+    3.  Scalability: 分流掉了 read的request
+2.  Master slave model: (most popular one since it don't have conflict resolution to handle)
     1.  Usually have 3 replicas: 一般来说在一个data center有两个，这样一个leader failed了可以快速的切换另一个，由于在同一个datacenter，
-    两个机器上的内容差异较小；但是相应的如果当前的datacenter failed了，如断电、地震等，那么就需要完了；故而一般会在另一个data center再有
+    两个机器上的内容差异较小；但是相应的如果当前的 data center failed了，如断电、地震等，那么就需要完了；故而一般会在另一个data center再有
     一个follower 来保证系统的运行；
     2.  Sync or async replication:
         1.  所谓sync or async，其实就是user在做update的时候，Master先被update了，然后Master会发送write请求给slave要求他们update。
@@ -252,7 +256,7 @@
             1.  优化：consistent prefix reads. 保证write的顺序不变。Write always hapend on same replica
     7.  多个的replica node非常适合于read 多写的少的情况。这样每个node都分流了，但是一定要考虑上述的replication lag的问题。
 
-3. Multi-leader solution:
+3. Multi-leader solution: More robust in presence of network interruptions and latency spikes but very weak consistency guarantees
     1.  Single leader的主要的问题在于说如果一个用户因为什么原因无法连上 Leader/Master 的话，那么就无法对 database进行任何的修改。
     2.  一般来说，在一个data center里面使用multi-leader是很少见的。一般的操作是在多个data center中留一个leader. 在data center内部仍旧
     使用regular的master-slave的模型。
@@ -282,3 +286,25 @@
         --> all to all 的问题在于order 无法保证；假如client A在lead1上将 A 从1 改为0；C 在A改完了后的时间上在 lead3 上将 A 从 1 改为 2
         那么这时候二者都会发 change request to lead2. 如果 lead3的信息先到，那么 lead1的信息可能就会被 discard.
         4.  解决办法是 version vector.
+
+4.  Concurrent handling:
+    1.  Master slave model:
+        1.  通过version ID来保存，每个用户端都保存一个local 的version ID, 而在服务器上也有一个 version ID. 每次在服务器上有修改
+        服务器上的version ID + 1, 然后用户在再次写的时候，将自己的version ID发给服务器，如果服务器上的version ID更大的话，那么保留另一个
+        version上的change到新的value上，然后一起返回给client, client再做merge操作并记为 server return的 version ID + 1
+    2.  Other model:
+        1.  类似于上述的情况，只是每个replica上都有自己的version, 故而需要一个 version vector instead of version number. 
+        
+        
+# Chapter 6: Partitioning/Sharding: Splitting a big database into smaller subsets
+1.  Partitioning is combined with replication, 假如说一个database被分成了三份，且replica了三份。这样的话，这样每台机器上都有一个完整
+的database，但是并不是一台机器作为master来design，而是说将每台机器都作为其中一个partition 的master来design. 这样写也被分流了
+2.  Skewed: partition的目标是平分来起到分流的作用，如果我们的parition是不公平的，那么肯定会造成局部的高流量。这个高流量区域叫做: hot spot
+而造成了hot spot的partition被称作 skewed.
+3.  Partitioning 的方法：
+    1.  Partitioning by key Range:
+        1.  sort data based on key. 然后像排书架一样的将key插入到对应的partition中。例如根据第一个字母来插入，也可以根据一天中的时间来分区
+        2.  每个partition的boundary可以是manuel chosen或者是 choose them automatically using rebalancing partitions.
+    2.  Partitioning by hash of key:
+        1.  
+        
