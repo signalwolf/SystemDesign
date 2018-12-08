@@ -305,6 +305,15 @@
     1.  Partitioning by key Range:
         1.  sort data based on key. 然后像排书架一样的将key插入到对应的partition中。例如根据第一个字母来插入，也可以根据一天中的时间来分区
         2.  每个partition的boundary可以是manuel chosen或者是 choose them automatically using rebalancing partitions.
+        3.  问题：
+            1.  开始的分区很难选择正确，而且随着时间的变动，分区的boundary也在不断的变化。非常容易造成hot spot
     2.  Partitioning by hash of key:
-        1.  
+        1.  Hash后来处理。用Hash function 来 产生 random number between 0 - power(2, 32) - 1. 然后每个server都只负责一部分的hash
+        number的量。
+        2.  Consistent Hashing
+        3.  问题：
+            1.  在hashing过后，数据之间的order是没有的。
+    3.  特别要考虑的地方：
+        1.  Celebrity user: 当一个这样的user有更新后，大量的follower会去read那一个partition，造成了 hot spot. 修改的办法是在 user
+        ID 去做hashing的时候在ID 前面和后面都加上一个或者多个random的number 然后再多次hashing，这样就能够hash到不同的partition上。
         
