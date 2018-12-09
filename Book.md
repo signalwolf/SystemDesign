@@ -301,6 +301,7 @@
 的database，但是并不是一台机器作为master来design，而是说将每台机器都作为其中一个partition 的master来design. 这样写也被分流了
 2.  Skewed: partition的目标是平分来起到分流的作用，如果我们的parition是不公平的，那么肯定会造成局部的高流量。这个高流量区域叫做: hot spot
 而造成了hot spot的partition被称作 skewed.
+4.  要注意增加、减少机器的时候，数据迁移要尽可能的减少
 3.  Partitioning 的方法：
     1.  Partitioning by key Range:
         1.  sort data based on key. 然后像排书架一样的将key插入到对应的partition中。例如根据第一个字母来插入，也可以根据一天中的时间来分区
@@ -309,11 +310,17 @@
             1.  开始的分区很难选择正确，而且随着时间的变动，分区的boundary也在不断的变化。非常容易造成hot spot
     2.  Partitioning by hash of key:
         1.  Hash后来处理。用Hash function 来 产生 random number between 0 - power(2, 32) - 1. 然后每个server都只负责一部分的hash
-        number的量。
+        number的量。这个hash number 到机器number的信息存储在 web server上。
         2.  Consistent Hashing
+            1.  ``
         3.  问题：
             1.  在hashing过后，数据之间的order是没有的。
     3.  特别要考虑的地方：
         1.  Celebrity user: 当一个这样的user有更新后，大量的follower会去read那一个partition，造成了 hot spot. 修改的办法是在 user
         ID 去做hashing的时候在ID 前面和后面都加上一个或者多个random的number 然后再多次hashing，这样就能够hash到不同的partition上。
+4.  Vertical Sharding vs Horizontal sharding:
+    1.  Vertical sharding: 不同的服务内容的数据库分在不同的服务器上. 例如 user table (user ID + password) vs user profile table (background and photos)
+        1.  缺点：不能解决某个table的load比较大的问题。
+    2.  Horizontal sharding: Consistent hashing
+        1.  
         
