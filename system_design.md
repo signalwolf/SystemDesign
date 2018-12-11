@@ -8,6 +8,14 @@ Step 6: Detailed design
 Step 7: Identifying and resolving bottlenecks
 Step 8: 
 
+## 设计系统的主要的考虑：
+1.  Scalability
+2.  Reliability
+3.  Availability
+4.  Efficiency: delay (response time) and bandwidth (process volume)
+5.  Serviceability or manageability
+
+
 ## System design moduels:
 1.  Load Balancing:
     1.  就是负责分流的部分，负责观测其后的模块的健康程度。尽可能的将新来的流量给放到相较 load更小的模块中。它可以存在于Web server和
