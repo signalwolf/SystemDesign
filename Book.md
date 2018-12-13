@@ -69,6 +69,19 @@
     2.  Imperative query: most of programming language
         1.  
 
+4.  各种database的对比:
+    1.  关系型：MySQL, Oracle, MS SQL, PostgreSQL
+        1.  有schema的要求 or schema on write. 因此更新起来是非常的麻烦的，需要整个system down，然后加入新的column
+        2.  但是在ACID的满足上是非常的好的，不需要很多的extra work
+    2.  文件型：Document: MongoDB, CouchDB
+    3.  Key-value: Redis, MemCache
+        1.  
+    4.  Column: HBase, Cassandra:
+        1.  相比于SQL的行式的database, 行式的database的储存是按照列来进行的。也就是说之前我们将一行的data存在一个地方，现在我们将一列的
+        data存在一起。
+        2.  优势：当我们只需要对某列进行修改的时候，例如facebook的message，那么我们只需要修改 content部分就好。这样的写是非常的快的
+
+
 10. Backup:
     key value; column family
     Graph data;
