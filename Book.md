@@ -79,7 +79,24 @@
     4.  Column: HBase, Cassandra:
         1.  相比于SQL的行式的database, 行式的database的储存是按照列来进行的。也就是说之前我们将一行的data存在一个地方，现在我们将一列的
         data存在一起。
-        2.  优势：当我们只需要对某列进行修改的时候，例如facebook的message，那么我们只需要修改 content部分就好。这样的写是非常的快的
+        2.  HBase相比于Cassandra:
+            1.  他们都是基于google big table的列族式的数据模型:
+            2.  Cassandra只有一种节点，而HBase有多种不同角色，除了处理读写请求的region server之外，
+            其架构在一套完整的HDFS分布式文件系统之上，并需要ZooKeeper来同步集群状态，部署上Cassandra更简单。
+            3.  Cassandra通过一致性哈希来决定一行数据存储在哪些节点，靠概率上的平均来实现负载均衡；
+            而HBase每段数据(region)只有一个节点负责处理，由master来动态分配一个region是否大到需要拆分成两个，
+            同时会将过热的节点上的一些region动态的分配给负载较低的节点，因此实现动态的负载均衡。
+            3.  因为每个region同时只能有一个节点处理，一旦这个节点无响应，在系统将这个节点的所有region转移到其他节点之前这些数据便无法读写，
+            加上master也只有一个节点，备用master的恢复也需要时间，因此HBase在一定程度上有单点问题；而Cassandra无单点问题。
+            4.  Cassandra的读写性能优于HBase:
+                1.  在读和写的Tput上，Cassandra在大集成的网络情况下都更优；
+                2.  在读的速度(latency)上，HBase更优, 但是在写的时候 Cassandra更优秀
+            5.  HBase 是 Master slave的结构，它可以和Hadoop MapReduce完美结合
+        2.  优势：当我们只需要对某列进行修改的时候，例如facebook的message，那么我们只需要修改 content部分就好。这样的写是非常的快的。
+        3.  行式的database更适合OLAP: 因为数据以列来存储，他们在磁盘的一个连续的地方，故而一次性就读完了整条信息，但是如果要做一个entity/cokumn上
+        range范围内的average等，那么就很慢，因为如果我们要读整个data 出来到memory然后还要再去找我们的这个entity的话，这样的操作时间快一点但是memory
+        的要求就很大；如果是每次都在disk上连续的读，每次都是一个I/O操作，故而时间上很久
+        4.  列式的database更适合OLTP: 因为数据以列存储，一次直接读一块到memory中然后再操作是非常快的
 
 
 10. Backup:
@@ -208,6 +225,14 @@
         bandwidth的情况，由此造成performance收到了影响
         2.  LSM tree的key不是唯一的，在LSM tree中 key肯定是有duplicate的，并且需要compaction来解决这个问题。而B tree中的key 是唯一的
         对于transactional semantics 是需要的（说是要lock key）
+    
+6.  Column orient database:
+    1.  Row based 的 database 的问题：如果要查找multiple row上的一个column的结果做分析。那么时间上非常慢，因为需要将整个row上的所有
+    的data 都load到memory中，然后再从中提取想要的data，再来才能process。
+    2.  Column orient database or wide column database 就是尝试解决这个问题：
+        1.  它的储存是按照column来的，因此by default就解决了这个问题。每次只需要load 这个column的data 到memory中就好
+        2.  它的另一个优势是减少存储空间，使用bitmap来表示data 而不是原先的data格式，这样能省下来很多的时间
+        3.  column的内容还可以sorted后存储，这样对于range request来说是非常的efficient的
             
             
 # Chapter5 Replication: Keeping a copy of the same data on several different nodes:
