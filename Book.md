@@ -73,9 +73,14 @@
     1.  关系型：MySQL, Oracle, MS SQL, PostgreSQL
         1.  有schema的要求 or schema on write. 因此更新起来是非常的麻烦的，需要整个system down，然后加入新的column
         2.  但是在ACID的满足上是非常的好的，不需要很多的extra work
-    2.  文件型：Document: MongoDB, CouchDB
-    3.  Key-value: Redis, MemCache
-        1.  
+    2.  文件型：Document: MongoDB, CouchDB： 解决关系型数据库中强schema的要求
+        1.  特别适合电商和游戏这类业务场景，因为不同商品的属性差异非常大
+        2.  缺点是不支持事务操作，完全不适合事务要求严格的场景
+        3.  无法实现join 操作
+    3.  Key-value: Redis, MemCache: 解决关系型数据库无法存储数据结构的问题
+        1.  Redis: key, value: value 可以是各种数据结构(string, hash, list, set and etc..)
+        2.  Redis 的主要的缺点：
+            1.  不支持完整的ACID事务，只能保证隔离性(I) 和一致性(C), 不能保证A与D
     4.  Column: HBase, Cassandra:
         1.  相比于SQL的行式的database, 行式的database的储存是按照列来进行的。也就是说之前我们将一行的data存在一个地方，现在我们将一列的
         data存在一起。
