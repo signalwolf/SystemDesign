@@ -13,6 +13,14 @@ class Ring(object):
         self.nodes = nodes
         self.hnodes = hnodes
         self.nodes_map = {self.hash(node): node.split("-")[1] for node in nodes}
+        self.reversemap = {}
+        for node in nodes:
+            curr = node.split("-")[1]
+            if node.split("-")[1] in self.reversemap:
+                self.reversemap[curr].append(self.hash(node))
+            else:
+                self.reversemap[curr] = [self.hash(node)]
+
 
     @staticmethod
     def hash(val):
@@ -37,6 +45,9 @@ class Ring(object):
 
 server_list = ["127.0.0.1", "127.0.0.2", "127.0.0.3"]
 ring = Ring(server_list)
+print ring.nodes
+for server in server_list:
+    print ring.reversemap[server]
 print ring.get_node("KNKLn")
 print ring.get_node("12213")
 print ring.get_node("2434")
